@@ -20,7 +20,10 @@ from pymongo import MongoClient
 from mongodb_engine import BucketHistoryService
 import uuid
 import certifi
+from tools import get_tool_system_prompt,TOOL_DEFINITIONS
 from dotenv import load_dotenv
+import json
+import re
 
 load_dotenv()
 
@@ -128,49 +131,56 @@ except Exception as e:
     history_service = None
 
 
-# --- Define Tools for the LLM ---
-tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "start_assessment",
-            "description": "Initiates a mental health assessment when the user expresses a desire to take a test or evaluate their feelings (e.g., 'I want to see how anxious I am', 'Can I take a depression test?').",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "assessment_type": {
-                        "type": "string",
-                        "description": "The type of assessment to start.",
-                        "enum": ["anxiety", "depression", "stress"]
-                    }
-                },
-                "required": ["assessment_type"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "track_mood",
-            "description": "Opens the mood tracking interface when the user wants to log how they are feeling (e.g., 'I want to track my mood', 'log my mood').",
-            "parameters": {"type": "object", "properties": {}}
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "show_resources",
-            "description": "Navigates to the resources page when a user asks for help, articles, or general resources (e.g., 'show me some resources', 'I need help').",
-            "parameters": {"type": "object", "properties": {}}
-        }
-    }
-]
 
 
 @app.route("/")
 def home():
     return jsonify({"message": "Mental Health Chatbot API is running!", "status": "active"})
 
+
+def analyze_intent(user_input):
+    """
+    Fast, zero-shot classification of user intent to handle crises immediately.
+    Uses Groq (fastest) or OpenAI to categorize the message.
+    """
+    router_prompt = f"""
+    You are a strictly mechanical intent classifier for a mental health app. 
+    Analyze the user's input and classify it into one of these categories.
+    
+    Output ONLY the JSON object. Do not output any conversational text.
+
+    CATEGORIES:
+    1. "CRISIS_PANIC" -> User is panicking, hyperventilating, freaking out, saying "can't breathe".
+    2. "CRISIS_SUICIDE" -> User mentions self-harm, ending life, or extreme hopelessness.
+    3. "MOOD_LOG" -> User explicitly wants to log mood (e.g., "I want to track my mood").
+    4. "GENERAL_CHAT" -> Normal conversation, venting, asking questions, feeling sad/anxious but not in immediate crisis.
+
+    USER INPUT: "{user_input}"
+    
+    Expected Output Format:
+    {{"category": "CATEGORY_NAME"}}
+    """
+
+    try:
+        # We use Groq for speed (low latency is crucial for panic attacks)
+        # If Groq isn't available, fallback to OpenAI
+        messages = [{"role": "system", "content": router_prompt}]
+        
+        # Determine which bot to use for routing (Prefer Groq for speed)
+        router_bot = groq_bot if groq_bot else openai_bot
+        
+        # Get raw response
+        response_text = router_bot.generate_response_with_history(messages)
+        
+        # CLEANUP: LLMs sometimes wrap JSON in markdown (```json ... ```). Remove it.
+        cleaned_text = re.sub(r'```json|```', '', response_text).strip()
+        
+        intent_data = json.loads(cleaned_text)
+        return intent_data.get("category", "GENERAL_CHAT")
+        
+    except Exception as e:
+        print(f"Router Error: {e}")
+        return "GENERAL_CHAT" # Fail-safe default
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -219,19 +229,63 @@ def chat():
                 content=user_message
             )
         return jsonify({"response": reply, "reply": reply}), 200
+    
+    # --- 4. INTENT ROUTER LOGIC ---
+    print("Analyzing Intent...")
+    intent = analyze_intent(user_message)
+    print(f"Detected Intent: {intent}")
+
+    if intent == "CRISIS_PANIC":
+        # Get tag dynamically from TOOL_DEFINITIONS
+        breathing_tag = TOOL_DEFINITIONS['activities']['breathing']['tag']
         
-    # 4. HISTORY RETRIEVAL
+        # Immediate Intervention
+        panic_response = f"I am here with you. I'm loading the breathing assistant now. Follow the animation with me. {breathing_tag}"
+        
+        if history_service:
+            history_service.add_message(chat_code, user_email, user_message)
+            history_service.add_message(chat_code, "assistant", panic_response)
+            
+        return jsonify({"response": panic_response, "reply": panic_response}), 200
+
+    elif intent == "CRISIS_SUICIDE":
+        # Immediate Safety Resource (No widget tag, strict text response)
+        safety_response = "I am very concerned about you. You are not alone. Please reach out to these crisis lines immediately:\n\n**National Helpline: 14416**\n**Vandrevala Foundation: 9999 666 555**"
+        
+        if history_service:
+            history_service.add_message(chat_code, user_email, user_message)
+            history_service.add_message(chat_code, "assistant", safety_response)
+
+        return jsonify({"response": safety_response, "reply": safety_response}), 200
+
+    elif intent == "MOOD_LOG":
+        # Handle explicit requests to log mood (e.g. "I want to track my mood")
+        mood_tag = TOOL_DEFINITIONS['mood_tracker']['tag']
+        
+        mood_response = f"Understood. Let's log how you are feeling right now. {mood_tag}"
+        
+        if history_service:
+            history_service.add_message(chat_code, user_email, user_message)
+            history_service.add_message(chat_code, "assistant", mood_response)
+
+        return jsonify({"response": mood_response, "reply": mood_response}), 200
+
+    # Note: We do NOT handle assessments (Anxiety/Depression) here in the Router.
+    # Why? Because assessments usually require a "Conversation -> Ask Permission -> Yes" flow.
+    # Those are handled by the LLM (Step 7) which uses the System Prompt to negotiate.
+
+    # 5. HISTORY RETRIEVAL
     chat_history = []
     if history_service:
         # Retrieve the last 20 messages for LLM context
         chat_history = history_service.get_history(chat_code, limit=20)
         print(f"Retrieved history length: {len(chat_history)}")
         
-    # 5. RAG RETRIEVAL
+    # 6. RAG RETRIEVAL
     context_chunks = get_rag_chunks(user_message)
     print(f"Context chunks found: {len(context_chunks)}")
     
-    # 6. CONSTRUCT FULL LLM CONTEXT
+    # 7. CONSTRUCT FULL LLM CONTEXT
     
     # Convert MongoDB documents into the LLM API format [{"role": "user", "content": "..."}]
     messages_for_llm = [
@@ -240,20 +294,28 @@ def chat():
         for m in chat_history
     ]
 
-    # Prepend the RAG context as a system prompt
-    system_prompt_rag = (
-        "You are a supportive mental health assistant. Always base your reply on the following context if relevant. "
-        "Context:\n\n" + "\n\n".join(context_chunks)
-    )
+    # --- SYSTEM PROMPT CONSTRUCTION (UPDATED) ---
+    # Get the RAG text
+    rag_text = "\n\n".join(context_chunks)
     
+    # Get the dynamic tool instructions from tools.py
+    tool_instructions = get_tool_system_prompt()
+
+    # Combine them
+    system_prompt = (
+        "You are a supportive mental health assistant. Always base your reply on the following context if relevant.\n"
+        f"Context:\n\n{rag_text}\n"
+        f"{tool_instructions}"
+    )
+
     # Final list of messages to send to the LLM (System + History + Current Message)
     final_messages = [
-        {"role": "system", "content": system_prompt_rag}
+        {"role": "system", "content": system_prompt}
     ] + messages_for_llm + [
         {"role": "user", "content": user_message}
     ]
 
-    # 7. GENERATE RESPONSE
+    # 8. GENERATE RESPONSE
     reply = ""
     print("USE_LOCAL_LLM",USE_LOCAL_LLM)
     if USE_LOCAL_LLM:
@@ -265,28 +327,13 @@ def chat():
             reply = local_bot.generate_response_with_history(final_messages)
         else:
             print("Local bot is down. Falling back to Cloud...")
-            llm_response = groq_bot.client.chat.completions.create(
-                model=groq_bot.model, messages=final_messages, tools=tools, tool_choice="auto"
-            )
+            reply=groq_bot.generate_response_with_history(final_messages)
     else:
         print("Using Engine: Cloud LLM")
-        llm_response = groq_bot.client.chat.completions.create(
-            model=groq_bot.model, messages=final_messages, tools=tools, tool_choice="auto"
-        )
+        reply=groq_bot.generate_response_with_history(final_messages)
+        
 
-    response_message = llm_response.choices[0].message
-    tool_calls = response_message.tool_calls
-
-    if tool_calls:
-        # If the model wants to call a tool, send that action to the frontend
-        tool_call = tool_calls[0].function
-        print(f"Tool Call Triggered: {tool_call.name}")
-        return jsonify({"action": tool_call.name, "arguments": tool_call.arguments}), 200
-
-    # Otherwise, it's a standard text reply
-    reply = response_message.content
-
-    # 8. SAVE HISTORY
+    # 9. SAVE HISTORY
     if history_service:
         # Saving the current user message
         history_service.add_message(
@@ -507,4 +554,4 @@ def get_stress_questions():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000, use_reloader=False)
+    app.run(debug=True, port=5000, use_reloader=True)
