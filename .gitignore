@@ -1,0 +1,48 @@
+# Node.js dependencies
+node_modules/
+.next/
+dist/
+
+# Python dependencies and build
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+ENV/
+.venv/
+.mypy_cache/
+.pytest_cache/
+instance/
+*.db
+backend/chroma_db/
+backend/data/
+backend/test_rag.py
+
+
+# Flask migrations (optional, if you want to regenerate on deploy)
+migrations/
+
+# Environment variables and secrets
+.env
+*.env
+
+# VS Code settings
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Lottie or animation cache
+*.lottie
+
+# Coverage reports
+coverage/
+*.cover
+*.coverage
+htmlcov/
