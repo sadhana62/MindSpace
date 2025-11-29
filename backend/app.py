@@ -138,50 +138,82 @@ def home():
     return jsonify({"message": "Mental Health Chatbot API is running!", "status": "active"})
 
 
-def analyze_intent(user_input):
-    """
-    Fast, zero-shot classification of user intent to handle crises immediately.
-    Uses Groq (fastest) or OpenAI to categorize the message.
-    """
-    router_prompt = f"""
-    You are a strictly mechanical intent classifier for a mental health app. 
-    Analyze the user's input and classify it into one of these categories.
-    
-    Output ONLY the JSON object. Do not output any conversational text.
+# ==========================================
+#  NEW HIERARCHICAL ROUTERS
+# ==========================================
 
-    CATEGORIES:
-    1. "CRISIS_PANIC" -> User is panicking, hyperventilating, freaking out, saying "can't breathe".
-    2. "CRISIS_SUICIDE" -> User mentions self-harm, ending life, or extreme hopelessness.
-    3. "MOOD_LOG" -> User explicitly wants to log mood (e.g., "I want to track my mood").
-    4. "GENERAL_CHAT" -> Normal conversation, venting, asking questions, feeling sad/anxious but not in immediate crisis.
-
-    USER INPUT: "{user_input}"
-    
-    Expected Output Format:
-    {{"category": "CATEGORY_NAME"}}
-    """
-
+def execute_router(prompt, default_val):
+    """Helper to run the LLM call for any router"""
     try:
-        # We use Groq for speed (low latency is crucial for panic attacks)
-        # If Groq isn't available, fallback to OpenAI
-        messages = [{"role": "system", "content": router_prompt}]
-        
-        # Determine which bot to use for routing (Prefer Groq for speed)
+        # Prefer Groq for speed
         router_bot = groq_bot if groq_bot else openai_bot
-        
-        # Get raw response
+        messages = [{"role": "system", "content": prompt}]
         response_text = router_bot.generate_response_with_history(messages)
         
-        # CLEANUP: LLMs sometimes wrap JSON in markdown (```json ... ```). Remove it.
         cleaned_text = re.sub(r'```json|```', '', response_text).strip()
-        
         intent_data = json.loads(cleaned_text)
-        return intent_data.get("category", "GENERAL_CHAT")
-        
+        return intent_data.get("category", default_val)
     except Exception as e:
         print(f"Router Error: {e}")
-        return "GENERAL_CHAT" # Fail-safe default
+        return default_val
+
+def analyze_broad_intent(user_input):
+    """
+    LEVEL 1: Determines the High-Level Category.
+    """
+    router_prompt = f"""
+    Classify the user's intent into ONE of these BROAD categories.
+    Output ONLY JSON: {{"category": "CATEGORY_NAME"}}
+
+    CATEGORIES:
+    1. "CRISIS_SUICIDE" -> Self-harm, ending life, extreme hopelessness.
+    2. "CRISIS_PANIC" -> Panicking, hyperventilating, "can't breathe".
+    3. "MOOD_LOG" -> Explicitly wants to log mood.
     
+    4. "ROUTING_ACTIVITY" -> User wants to do a physical or relaxation exercise (breathe, stretch, walk, meditate).
+    5. "ROUTING_ASSESSMENT" -> User wants to take a test, quiz, or check mental levels (anxiety, depression, stress).
+    
+    6. "GENERAL_CHAT" -> Normal conversation, venting, questions.
+
+    USER INPUT: "{user_input}"
+    """
+    return execute_router(router_prompt, "GENERAL_CHAT")
+
+def classify_activity_type(user_input):
+    """
+    LEVEL 2 (Activities): Determines which specific activity.
+    """
+    router_prompt = f"""
+    The user wants to perform an activity. Classify into one specific type.
+    Output ONLY JSON: {{"category": "CATEGORY_NAME"}}
+
+    CATEGORIES:
+    1. "breathing" -> Relaxation, meditation, calming down, deep breaths.
+    2. "stretch" -> Physical tension, neck pain, sitting too long, yoga.
+    3. "walking" -> Restless, need a break, change of scenery, trapped.
+
+    USER INPUT: "{user_input}"
+    """
+    # Matches keys in TOOL_DEFINITIONS['activities']
+    return execute_router(router_prompt, "breathing") 
+
+def classify_assessment_type(user_input):
+    """
+    LEVEL 2 (Assessments): Determines which specific test.
+    """
+    router_prompt = f"""
+    The user wants to take a mental health assessment. Classify into one specific type.
+    Output ONLY JSON: {{"category": "CATEGORY_NAME"}}
+
+    CATEGORIES:
+    1. "anxiety" -> GAD-7, worried, nervous, on edge.
+    2. "depression" -> PHQ-9, sad, hopeless, no energy.
+    3. "stress" -> Overwhelmed, burnout, pressure.
+
+    USER INPUT: "{user_input}"
+    """
+    # Matches keys in TOOL_DEFINITIONS['assess']
+    return execute_router(router_prompt, "stress")
 
 def determine_widget_type(text_response):
     """
@@ -204,6 +236,15 @@ def determine_widget_type(text_response):
     # 3. Default fallback
     return "general_chat"
 
+def remove_tags_from_text(text):
+    """
+    Removes any substring matching <<ACTION: ... >> from the text.
+    """
+    # Regex pattern to find <<ACTION:ANYTHING_INSIDE>>
+    cleaned_text = re.sub(r'<<ACTION:.*?>>', '', text)
+    return cleaned_text.strip()
+
+@app.route("/chat", methods=["POST"])
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json(silent=True) or {}
@@ -211,11 +252,10 @@ def chat():
     messages_payload = data.get("messages")
     print(data)
     
-    # 1. USER IDENTITY AND CHAT CODE LOOKUP
+    # 1. USER IDENTITY
     user_email = data.get("email")
-
     if not user_email:
-        return jsonify({"error": "User identity (email) is required for chat history lookup."}), 401
+        return jsonify({"error": "User identity (email) is required."}), 401
 
     user = User.query.filter_by(email=user_email).first()
     if not user:
@@ -223,11 +263,10 @@ def chat():
 
     chat_code = user.chat_code  
 
-    # --- 2. MESSAGE EXTRACTION---
+    # 2. MESSAGE EXTRACTION
     user_message = ""
     if single_message:
         user_message = str(single_message)
-
     elif isinstance(messages_payload, list) and len(messages_payload) > 0:
         for m in reversed(messages_payload):
             if m.get("role") == "user":
@@ -235,146 +274,127 @@ def chat():
                 break
 
     if not user_message:
-        return jsonify({"error": "No user message provided in payload"}), 400
+        return jsonify({"error": "No user message provided"}), 400
 
-
-    # --- 3. GUARDRAILS CHECK---
+    # 3. GUARDRAILS CHECK
     if not is_query_mental_health_related(user_message):
-        print("Guardrail Triggered: Off-topic")
         reply = random.choice(OFF_TOPIC_REPLIES)
-        
-        # Save the off-topic user message
         if history_service:
-            history_service.add_message(
-                conversation_id=chat_code,
-                sender_id=user_email,
-                content=user_message
-            )
-        
-        # UPDATED RETURN: Includes widget_type
+            history_service.add_message(chat_code, user_email, user_message)
+        # Returns standard structure
         return jsonify({
             "response": reply, 
             "reply": reply, 
             "widget_type": "off_topic"
         }), 200
     
-    # --- 4. INTENT ROUTER LOGIC ---
-    print("Analyzing Intent...")
-    intent = analyze_intent(user_message)
-    print(f"Detected Intent: {intent}")
+    # 4. HIERARCHICAL INTENT ROUTING
+    print("Analyzing Broad Intent...")
+    broad_intent = analyze_broad_intent(user_message)
+    print(f"Broad Intent: {broad_intent}")
 
-    if intent == "CRISIS_PANIC":
-        breathing_tag = TOOL_DEFINITIONS['activities']['breathing']['tag']
-        panic_response = f"I am here with you. I'm loading the breathing assistant now. Follow the animation with me."
+    # Initialize DEFAULT values (fallback to general chat)
+    widget_type = "general_chat"
+    assistant_reply = ""
+
+    # --- BRANCH A: CRISIS & MOOD (Direct) ---
+    if broad_intent == "CRISIS_SUICIDE":
+        assistant_reply = "I am very concerned about you. You are not alone. Please reach out to these crisis lines immediately:\n\n**National Helpline: 14416**\n**Vandrevala Foundation: 9999 666 555**"
+        widget_type = "crisis_resource"
+
+    elif broad_intent == "CRISIS_PANIC":
+        # Panic skips the "Activity" router for speed
+        tag = TOOL_DEFINITIONS['activities']['breathing']['tag']
+        assistant_reply = f"I am here with you. Let's focus on your breathing right now. Follow this animation."
+        widget_type = "breathing"
+
+    elif broad_intent == "MOOD_LOG":
+        tag = TOOL_DEFINITIONS['mood_tracker']['tag']
+        assistant_reply = f"Understood. Let's log how you are feeling right now."
+        widget_type = "mood_tracker"
+
+    # --- BRANCH B: ACTIVITIES (Sub-Router) ---
+    elif broad_intent == "ROUTING_ACTIVITY":
+        print("Routing Activity Sub-type...")
+        specific_activity = classify_activity_type(user_message) # e.g. "stretch"
         
-        if history_service:
-            history_service.add_message(chat_code, user_email, user_message)
-            history_service.add_message(chat_code, "assistant", panic_response)
-            
-        # UPDATED RETURN: Explicitly sends "breathing" widget
-        return jsonify({
-            "response": panic_response, 
-            "reply": panic_response,
-            "widget_type": "breathing" 
-        }), 200
-
-    elif intent == "CRISIS_SUICIDE":
-        safety_response = "I am very concerned about you. You are not alone. Please reach out to these crisis lines immediately:\n\n**National Helpline: 14416**\n**Vandrevala Foundation: 9999 666 555**"
-        
-        if history_service:
-            history_service.add_message(chat_code, user_email, user_message)
-            history_service.add_message(chat_code, "assistant", safety_response)
-
-        # UPDATED RETURN: Explicitly sends "crisis_resource" widget
-        return jsonify({
-            "response": safety_response, 
-            "reply": safety_response,
-            "widget_type": "crisis_resource"
-        }), 200
-
-    elif intent == "MOOD_LOG":
-        mood_tag = TOOL_DEFINITIONS['mood_tracker']['tag']
-        mood_response = f"Understood. Let's log how you are feeling right now."
-        
-        if history_service:
-            history_service.add_message(chat_code, user_email, user_message)
-            history_service.add_message(chat_code, "assistant", mood_response)
-
-        # UPDATED RETURN: Explicitly sends "mood_tracker" widget
-        return jsonify({
-            "response": mood_response, 
-            "reply": mood_response,
-            "widget_type": "mood_tracker"
-        }), 200
-
-
-    # 5. HISTORY RETRIEVAL
-    chat_history = []
-    if history_service:
-        chat_history = history_service.get_history(chat_code, limit=20)
-        print(f"Retrieved history length: {len(chat_history)}")
-        
-    # 6. RAG RETRIEVAL
-    context_chunks = get_rag_chunks(user_message)
-    print(f"Context chunks found: {len(context_chunks)}")
-    
-    # 7. CONSTRUCT FULL LLM CONTEXT
-    messages_for_llm = [
-        {"role": "user" if m['sender_id'] == user_email else "assistant", 
-         "content": m['content']} 
-        for m in chat_history
-    ]
-
-    rag_text = "\n\n".join(context_chunks)
-    tool_instructions = get_tool_system_prompt()
-
-    system_prompt = (
-        "You are a supportive mental health assistant. Always base your reply on the following context if relevant.\n"
-        f"Context:\n\n{rag_text}\n"
-        f"{tool_instructions}"
-    )
-
-    final_messages = [
-        {"role": "system", "content": system_prompt}
-    ] + messages_for_llm + [
-        {"role": "user", "content": user_message}
-    ]
-
-    # 8. GENERATE RESPONSE
-    reply = ""
-    print("USE_LOCAL_LLM",USE_LOCAL_LLM)
-    if USE_LOCAL_LLM:
-        print("Using Engine: OLLAMA (Local)")
-        if local_bot.check_status():
-            reply = local_bot.generate_response_with_history(final_messages)
+        # Verify it exists in definitions
+        if specific_activity in TOOL_DEFINITIONS['activities']:
+            tool_data = TOOL_DEFINITIONS['activities'][specific_activity]
+            assistant_reply = f"That sounds like a good idea. Let's do it."
+            widget_type = specific_activity
         else:
-            print("Local bot is down. Falling back to Cloud...")
-            reply=groq_bot.generate_response_with_history(final_messages)
-    else:
-        print("Using Engine: Cloud LLM")
-        reply=groq_bot.generate_response_with_history(final_messages)
-        
-    # --- NEW: DETERMINE WIDGET TYPE FOR GENERAL CHAT ---
-    final_widget_type = determine_widget_type(reply)
+            # Fallback
+            assistant_reply = "Here is a breathing exercise to help you center yourself."
+            widget_type = "breathing"
 
-    # 9. SAVE HISTORY
+    # --- BRANCH C: ASSESSMENTS (Sub-Router) ---
+    elif broad_intent == "ROUTING_ASSESSMENT":
+        print("Routing Assessment Sub-type...")
+        specific_test = classify_assessment_type(user_message) # e.g. "anxiety"
+        
+        if specific_test in TOOL_DEFINITIONS['assess']:
+            tool_data = TOOL_DEFINITIONS['assess'][specific_test]
+            assistant_reply = f"Let's check in on your levels."
+            widget_type = specific_test
+        else:
+            assistant_reply = "Let's check your stress levels."
+            widget_type = "stress"
+
+    # --- BRANCH D: GENERAL CHAT (RAG Flow) ---
+    else:
+        # 5. HISTORY RETRIEVAL
+        chat_history = []
+        if history_service:
+            chat_history = history_service.get_history(chat_code, limit=20)
+
+        # 6. RAG RETRIEVAL
+        context_chunks = get_rag_chunks(user_message)
+        
+        # 7. CONSTRUCT PROMPT
+        messages_for_llm = [
+            {"role": "user" if m['sender_id'] == user_email else "assistant", "content": m['content']} 
+            for m in chat_history
+        ]
+        rag_text = "\n\n".join(context_chunks)
+        tool_instructions = get_tool_system_prompt()
+        system_prompt = (
+            "You are a supportive mental health assistant. Always base your reply on the following context if relevant.\n"
+            f"Context:\n\n{rag_text}\n"
+            f"{tool_instructions}"
+        )
+        final_messages = [{"role": "system", "content": system_prompt}] + messages_for_llm + [{"role": "user", "content": user_message}]
+
+        # 8. GENERATE RESPONSE
+        if USE_LOCAL_LLM:
+             if local_bot.check_status():
+                 assistant_reply = local_bot.generate_response_with_history(final_messages)
+             else:
+                 assistant_reply = groq_bot.generate_response_with_history(final_messages)
+        else:
+             assistant_reply = groq_bot.generate_response_with_history(final_messages)
+        
+        # 9. DETERMINE WIDGET (Final Check)
+        # Even in general chat, the LLM might have decided to output a tag.
+        widget_type = determine_widget_type(assistant_reply)
+
+
+    # FINAL SAVE & RETURN
+    
+    # 1. Save the RAW response (with tags) to History
+    # We keep tags in history so the LLM knows it previously used a tool
     if history_service:
-        history_service.add_message(
-            conversation_id=chat_code,
-            sender_id=user_email,
-            content=user_message
-        )
+        history_service.add_message(conversation_id=chat_code, sender_id=user_email, content=user_message)
+        history_service.add_message(conversation_id=chat_code, sender_id="assistant", content=assistant_reply)
         
-        history_service.add_message(
-            conversation_id=chat_code,
-            sender_id="assistant",
-            content=reply
-        )
-        
+    # 2. Creating a CLEAN response (no tags) for the Frontend
+    clean_reply = remove_tags_from_text(assistant_reply)
+
+    # 3. Send the clean text + the widget type
     return jsonify({
-        "response": reply, 
-        "reply": reply,
-        "widget_type": final_widget_type
+        "response": clean_reply,   
+        "reply": clean_reply,      
+        "widget_type": widget_type
     }), 200
 
 @app.route("/register", methods=["POST"])
