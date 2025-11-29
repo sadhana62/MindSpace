@@ -1,13 +1,30 @@
-"use client"
+"use client";
 
-import { useState, FormEvent, useEffect, useRef, use } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Heart, Brain, MessageCircle, BookOpen, Users, Shield, Phone, AlertTriangle, TrendingUp, List, Zap, Target } from "lucide-react"
-import { MoreVertical, LayoutDashboard, LogOut } from "lucide-react"
+import { useState, FormEvent, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Heart,
+  Brain,
+  BookOpen,
+  Users,
+  Shield,
+  AlertTriangle,
+  TrendingUp,
+  List,
+  Zap,
+  Target,
+  LayoutDashboard,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,54 +33,77 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { CrisisChatbot } from "@/components/crisis-chatbot";
+import toast from "react-hot-toast";
+import { Line } from "react-chartjs-2";
 import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
-import { CrisisChatbot } from "@/components/crisis-chatbot"
-import toast from "react-hot-toast"
-import { Line } from "react-chartjs-2"
-import { Chart, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from "chart.js"
-import { set } from "date-fns"
-Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
+  Chart,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+Chart.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend
+);
 
 export default function MentalHealthPortal() {
-  const [currentMood, setCurrentMood] = useState<string>("")
-  const [assessmentProgress, setAssessmentProgress] = useState(0)
+  const [currentMood, setCurrentMood] = useState<string>("");
+  const [assessmentProgress, setAssessmentProgress] = useState(0);
 
   // State for modals and forms
-  const [loginModalOpen, setLoginModalOpen] = useState(false)
-  const [registerModalOpen, setRegisterModalOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null)
-  const [activeTab, setActiveTab] = useState("dashboard")
-  const [moodHistory, setMoodHistory] = useState<any[]>([])
-  const [moodNote, setMoodNote] = useState("")
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [registerModalOpen, setRegisterModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [user, setUser] = useState<{ name: string; email: string } | null>(
+    null
+  );
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [moodHistory, setMoodHistory] = useState<any[]>([]);
+  const [moodNote, setMoodNote] = useState("");
 
-  const [assessmentModal, setAssessmentModal] = useState<null | "anxiety" | "depression" | "stress">(null)
-  const [assessmentAnswers, setAssessmentAnswers] = useState<any>({})
-  const [assessmentResult, setAssessmentResult] = useState<string | null>(null)
-  const [activityLoading, setActivityLoading] = useState(false)
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-  const [assessmentQuestions, setAssessmentQuestions] = useState<string[]>([])
+  const [assessmentModal, setAssessmentModal] = useState<
+    null | "anxiety" | "depression" | "stress"
+  >(null);
+  const [assessmentAnswers, setAssessmentAnswers] = useState<any>({});
+  const [assessmentResult, setAssessmentResult] = useState<string | null>(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [assessmentQuestions, setAssessmentQuestions] = useState<string[]>([]);
 
   const [latestAssessmentResults, setLatestAssessmentResults] = useState<{
-    anxiety?: string
-    depression?: string
-    stress?: string
-  }>({})
+    anxiety?: string;
+    depression?: string;
+    stress?: string;
+  }>({});
 
-  const [activityDialogOpen, setActivityDialogOpen] = useState(false)
-  const [currentActivity, setCurrentActivity] = useState<{ name: string; sound: string } | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  
-  const [chatHistroy,setHistroy] = useState<{role:string,content:string}[]>([])
+  const [activityDialogOpen, setActivityDialogOpen] = useState(false);
+  const [currentActivity, setCurrentActivity] = useState<{
+    name: string;
+    sound: string;
+  } | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Chat State
+  const [isBotTyping, setIsBotTyping] = useState(false);
+  const [activeChatWidget, setActiveChatWidget] = useState<string | null>(null);
+  const [pendingWidget, setPendingWidget] = useState<string | null>(null); // New state for confirmation
+  const [chatHistory, setHistory] = useState<
+    { role: string; content: string }[]
+  >([]);
 
   const moodLabelMap: { [key: string]: string } = {
     great: "Great",
@@ -71,7 +111,7 @@ export default function MentalHealthPortal() {
     okay: "Okay",
     low: "Low",
     struggling: "Struggling",
-  }
+  };
 
   const moodValueMap: { [key: string]: number } = {
     great: 100,
@@ -79,85 +119,91 @@ export default function MentalHealthPortal() {
     okay: 50,
     low: 25,
     struggling: 0,
-  }
+  };
 
-  // For anxiety scores, keep a history in state
-  const [anxietyHistory, setAnxietyHistory] = useState<{ date: string; score: number }[]>([])
-  const [depressionHistory, setDepressionHistory] = useState<{ date: string; score: number }[]>([])
-  const [stressHistory, setStressHistory] = useState<{ date: string; score: number }[]>([])
+  // History states
+  const [anxietyHistory, setAnxietyHistory] = useState<
+    { date: string; score: number }[]
+  >([]);
+  const [depressionHistory, setDepressionHistory] = useState<
+    { date: string; score: number }[]
+  >([]);
+  const [stressHistory, setStressHistory] = useState<
+    { date: string; score: number }[]
+  >([]);
 
   const handleRegister = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setIsLoading(true)
-    const formData = new FormData(e.currentTarget)
-    console.log("Form Data Entries:", Array.from(formData.entries()))
-    const data = Object.fromEntries(formData.entries())
+    e.preventDefault();
+    setIsLoading(true);
+    const formData = new FormData(e.currentTarget);
+    const data = Object.fromEntries(formData.entries());
 
     try {
       const response = await fetch("http://localhost:5000/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
-      })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.error || "Registration failed")
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Registration failed");
 
-      // Automatically log the user in
-      toast.success(`Welcome, ${result.user.name}! Your account has been created.`)
-      setUser(result.user)
-      localStorage.setItem("mindspace-user", JSON.stringify(result.user))
-      setRegisterModalOpen(false)
+      toast.success(
+        `Welcome, ${result.user.name}! Your account has been created.`
+      );
+      setUser(result.user);
+      localStorage.setItem("mindspace-user", JSON.stringify(result.user));
+      setRegisterModalOpen(false);
     } catch (error: any) {
-      console.log("error",error);
-      toast.error(error.message)
+      console.log("error", error);
+      toast.error(error.message);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setIsLoading(true)
-    const formData = new FormData(e.currentTarget)
-    const data = Object.fromEntries(formData.entries())
+    e.preventDefault();
+    setIsLoading(true);
+    const formData = new FormData(e.currentTarget);
+    const data = Object.fromEntries(formData.entries());
 
     try {
       const response = await fetch("http://localhost:5000/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
-      })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.error || "Login failed")
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Login failed");
 
-      toast.success(`Welcome back, ${result.user.name}!`)
-      setUser(result.user)
-      localStorage.setItem("mindspace-user", JSON.stringify(result.user)) // Store user in localStorage
-      setLoginModalOpen(false)
+      toast.success(`Welcome back, ${result.user.name}!`);
+      setUser(result.user);
+      localStorage.setItem("mindspace-user", JSON.stringify(result.user));
+      setLoginModalOpen(false);
     } catch (error: any) {
-      toast.error(error.message)
+      toast.error(error.message);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleSignOut = () => {
-    setUser(null)
-    localStorage.removeItem("mindspace-user")
-    setMoodHistory([]) // Clear mood history
-    setLatestAssessmentResults({}) // Clear assessment results
-    setAnxietyHistory([]) // Clear anxiety scores
-    setDepressionHistory([]) // Clear depression scores
-    setStressHistory([]) // Clear stress scores
-    setAssessmentProgress(0) // Reset assessment progress
-    toast.success("You have been signed out.")
-  }
+    setUser(null);
+    localStorage.removeItem("mindspace-user");
+    setMoodHistory([]);
+    setLatestAssessmentResults({});
+    setAnxietyHistory([]);
+    setDepressionHistory([]);
+    setStressHistory([]);
+    setAssessmentProgress(0);
+    toast.success("You have been signed out.");
+  };
 
   const handleSaveMood = async () => {
-    if (!user || !currentMood) return
-    setIsLoading(true)
+    if (!user || !currentMood) return;
+    setIsLoading(true);
     try {
-      const today = new Date().toISOString().slice(0, 10) // "YYYY-MM-DD"
+      const today = new Date().toISOString().slice(0, 10);
       const response = await fetch("http://localhost:5000/mood", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -165,303 +211,442 @@ export default function MentalHealthPortal() {
           email: user.email,
           mood: currentMood,
           note: moodNote,
-          entry_date: today, 
+          entry_date: today,
         }),
-      })
-  
+      });
 
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.error || "Failed to save mood")
-      toast.success("Your mood has been saved!")
-      fetchMoodHistory(user.email)
-         setCurrentMood("")
-     setMoodNote("")
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to save mood");
+      toast.success("Your mood has been saved!");
+      fetchMoodHistory(user.email);
+      setCurrentMood("");
+      setMoodNote("");
     } catch (error: any) {
-      toast.error(error.message)
+      toast.error(error.message);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const fetchMoodHistory = async (email: string) => {
-    const response = await fetch(`http://localhost:5000/moods/${email}`)
+    const response = await fetch(`http://localhost:5000/moods/${email}`);
     if (response.ok) {
-      const data = await response.json()
-      setMoodHistory(data)
+      const data = await response.json();
+      setMoodHistory(data);
     }
-  }
+  };
 
   const fetchAssessmentHistory = async (email: string) => {
     try {
-      const response = await fetch(`http://localhost:5000/assessments/${email}`)
+      const response = await fetch(
+        `http://localhost:5000/assessments/${email}`
+      );
       if (response.ok) {
-        const data = await response.json()
-        // Assuming data is { anxiety: [...], depression: [...], stress: [...] }
-        // where each array item is { date: "...", score: ... }
+        const data = await response.json();
         if (data.anxiety) {
-          setAnxietyHistory(data.anxiety.map((item: any) => ({ date: new Date(item.date).toLocaleDateString(), score: item.score })))
+          setAnxietyHistory(
+            data.anxiety.map((item: any) => ({
+              date: new Date(item.date).toLocaleDateString(),
+              score: item.score,
+            }))
+          );
         }
         if (data.depression) {
-          setDepressionHistory(data.depression.map((item: any) => ({ date: new Date(item.date).toLocaleDateString(), score: item.score })))
+          setDepressionHistory(
+            data.depression.map((item: any) => ({
+              date: new Date(item.date).toLocaleDateString(),
+              score: item.score,
+            }))
+          );
         }
         if (data.stress) {
-          setStressHistory(data.stress.map((item: any) => ({ date: new Date(item.date).toLocaleDateString(), score: item.score })))
+          setStressHistory(
+            data.stress.map((item: any) => ({
+              date: new Date(item.date).toLocaleDateString(),
+              score: item.score,
+            }))
+          );
         }
       }
     } catch (error) {
-      console.error("Failed to fetch assessment history:", error)
+      console.error("Failed to fetch assessment history:", error);
     }
-  }
-  // Update handleAssessmentStart to fetch questions from backend
-  const handleAssessmentStart = async (type: "anxiety" | "depression" | "stress") => {
-    setAssessmentModal(type)
-    setAssessmentAnswers({})
-    setAssessmentResult(null)
-    setAssessmentQuestions([])
-    setCurrentQuestionIndex(0)
+  };
 
-    // Fetch questions from backend
-    let endpoint = ""
-    if (type === "anxiety") endpoint = "anxiety"
-    else if (type === "depression") endpoint = "depression"
-    else if (type === "stress") endpoint = "stress"
-    const response = await fetch(`http://localhost:5000/assessment/questions/${endpoint}`)
+  const handleAssessmentStart = async (
+    type: "anxiety" | "depression" | "stress"
+  ) => {
+    setAssessmentModal(type);
+    setAssessmentAnswers({});
+    setAssessmentResult(null);
+    setAssessmentQuestions([]);
+    setCurrentQuestionIndex(0);
+
+    let endpoint = "";
+    if (type === "anxiety") endpoint = "anxiety";
+    else if (type === "depression") endpoint = "depression";
+    else if (type === "stress") endpoint = "stress";
+    const response = await fetch(
+      `http://localhost:5000/assessment/questions/${endpoint}`
+    );
     if (response.ok) {
-      const data = await response.json()
-      setAssessmentQuestions(data.questions)
+      const data = await response.json();
+      setAssessmentQuestions(data.questions);
     }
-  }
-  
+  };
+
   const handleAnswerSelect = (questionIndex: number, answerValue: string) => {
-    const newAnswers = { ...assessmentAnswers, [`q${questionIndex}`]: answerValue }
-    setAssessmentAnswers(newAnswers)
+    const newAnswers = {
+      ...assessmentAnswers,
+      [`q${questionIndex}`]: answerValue,
+    };
+    setAssessmentAnswers(newAnswers);
 
-    // Move to the next question or submit
     if (currentQuestionIndex < assessmentQuestions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1)
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      // Last question answered, submit the assessment
-      handleAssessmentSubmit(assessmentModal!, newAnswers)
+      handleAssessmentSubmit(assessmentModal!, newAnswers);
     }
-  }
-
+  };
 
   const handleAssessmentSubmit = async (type: string, answers: any) => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       const response = await fetch(`http://localhost:5000/assessment/${type}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: user?.email, answers }),
-      })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.error || "Assessment failed")
-      setAssessmentResult(result.result || "Assessment completed.")
-      setAssessmentProgress((prev) => Math.min(prev + 33, 100))
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Assessment failed");
+      setAssessmentResult(result.result || "Assessment completed.");
+      setAssessmentProgress((prev) => Math.min(prev + 33, 100));
       setLatestAssessmentResults((prev) => ({
         ...prev,
-        [type]: result.result || "Assessment completed."
-      }))
-      // Assuming backend returns { result: "...", score: 12 }
+        [type]: result.result || "Assessment completed.",
+      }));
+
       if (result.score !== undefined) {
-        const newEntry = { date: new Date().toLocaleDateString(), score: result.score };
+        const newEntry = {
+          date: new Date().toLocaleDateString(),
+          score: result.score,
+        };
         if (type === "anxiety") {
-          setAnxietyHistory(prev => [
-            ...prev,
-            newEntry
-          ])
+          setAnxietyHistory((prev) => [...prev, newEntry]);
         } else if (type === "depression") {
-          setDepressionHistory(prev => [
-            ...prev, newEntry
-          ])
+          setDepressionHistory((prev) => [...prev, newEntry]);
         } else if (type === "stress") {
-          setStressHistory(prev => [
-            ...prev, newEntry
-          ])
-        } 
+          setStressHistory((prev) => [...prev, newEntry]);
+        }
       }
     } catch (error: any) {
-      toast.error(error.message)
+      toast.error(error.message);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
-  const handleActivityLog = async (activity: string) => {
-    setActivityLoading(true)
-    try {
-      await fetch("http://localhost:5000/activity", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: user?.email, activity }),
-      })
-      toast.success(`${activity} activity logged!`)
-    } catch (error: any) {
-      toast.error("Failed to log activity.")
-    } finally {
-      setActivityLoading(false)
-    }
-  }
-
-  const handleSendMessages = async (message:string) => {
-    const newHiostroy = [...chatHistroy,{role:"user",content:message}]
-    setHistroy(newHiostroy)
-
-    const response = await fetch("http://localhost:5000/chat",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({messages:newHiostroy})   
-  })
-    const data = await response.json()
-    const botText = data.response ?? data.reply ?? ""
-    setHistroy([...newHiostroy,{role:"assistant",content:botText}])
-  }
-  // Play/Pause handlers
+  // Activity Sound Logic
   const handlePlaySound = () => {
     if (audioRef.current) {
-      audioRef.current.play()
-      setIsPlaying(true)
+      audioRef.current.play();
+      setIsPlaying(true);
     }
-  }
+  };
   const handlePauseSound = () => {
     if (audioRef.current) {
-      audioRef.current.pause()
-      setIsPlaying(false)
+      audioRef.current.pause();
+      setIsPlaying(false);
     }
-  }
-  const handleOpenActivityDialog = (activity: { name: string; sound: string }) => {
-    setCurrentActivity(activity)
-    setActivityDialogOpen(true)
-    setIsPlaying(false)
+  };
+  const handleOpenActivityDialog = (activity: {
+    name: string;
+    sound: string;
+  }) => {
+    setCurrentActivity(activity);
+    setActivityDialogOpen(true);
+    setIsPlaying(false);
     if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.currentTime = 0
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
-  }
+  };
 
-  // Effect to check for a logged-in user on component mount
+  // --- CHAT LOGIC ---
+
+  const handleSendMessages = async (message: string) => {
+    const newUserMessage = { role: "user", content: message };
+    setHistory((prev) => [...prev, newUserMessage]);
+    setIsBotTyping(true);
+    setActiveChatWidget(null); // Hide old widgets
+    setPendingWidget(null); // Reset pending state on new message
+
+    try {
+      const response = await fetch("http://localhost:5000/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...chatHistory, newUserMessage],
+          email: user?.email,
+        }),
+      });
+      const data = await response.json();
+      console.log("Chatbot response data:", data);
+
+      const botText = data.reply || data.response || "";
+      const widgetType = data.widget_type;
+
+      const botMessage = { role: "assistant", content: botText };
+      setHistory((prev) => [...prev, botMessage]);
+      setIsBotTyping(false);
+
+      // Only act on widget type if it's not off_topic
+      console.log("Chat suggests widget:", widgetType);
+      if (
+        widgetType &&
+        widgetType !== "off_topic" &&
+        widgetType !== "general_chat"
+      ) {
+        console.log("Chat suggests widget:", widgetType);
+        setPendingWidget(widgetType);
+      }
+    } catch (error) {
+      console.error(error);
+      setIsBotTyping(false);
+    }
+  };
+
+  const handleChatConfirmation = (confirmed: boolean) => {
+    if (!pendingWidget) return;
+
+    if (confirmed) {
+      // User confirmed: Add 'Yes' to history and trigger the action
+      setHistory((prev) => [
+        ...prev,
+        { role: "user", content: "Yes, please." },
+      ]);
+
+      // 1. Check if it's an Activity (Breathing, Stretch, Walking)
+      // Map backend widget strings to your frontend activity objects
+      const activityMap: Record<string, { name: string; sound: string }> = {
+        breathing: { name: "Guided Breathing", sound: "/sounds/breathing.mp3" },
+        stretch: { name: "Stretch", sound: "/sounds/yoga.mp3" },
+        walking: { name: "Mindful Walking", sound: "/sounds/walking.mp3" },
+      };
+
+      if (activityMap[pendingWidget]) {
+        // Open the specific activity modal
+        handleOpenActivityDialog(activityMap[pendingWidget]);
+        setHistory((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `Opening ${activityMap[pendingWidget].name} for you.`,
+          },
+        ]);
+      }
+      // 2. Check if it's an Assessment
+      else if (pendingWidget.startsWith("assess_")) {
+        const type = pendingWidget.replace("assess_", "") as
+          | "anxiety"
+          | "depression"
+          | "stress";
+        handleAssessmentStart(type);
+        setHistory((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `I've opened the ${type} assessment for you.`,
+          },
+        ]);
+      }
+      // 3. Check if it's an inline widget (Mood Tracker)
+      else {
+        setActiveChatWidget(pendingWidget);
+      }
+    } else {
+      // User declined: Add 'No' to history
+      setHistory((prev) => [
+        ...prev,
+        { role: "user", content: "No, maybe later." },
+      ]);
+      setHistory((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Okay, I understand. Let me know if you change your mind.",
+        },
+      ]);
+    }
+
+    // Reset pending state
+    setPendingWidget(null);
+  };
+
+  // --- EFFECT HOOKS ---
+
   useEffect(() => {
-    setMounted(true) // Indicate that the component has mounted on the client
-    const storedUser = localStorage.getItem("mindspace-user")
+    setMounted(true);
+    const storedUser = localStorage.getItem("mindspace-user");
     if (storedUser) {
       try {
-        const parsedUser = JSON.parse(storedUser)
-        setUser(parsedUser)
-        setActiveTab("dashboard") // Set dashboard as default for logged-in users
-        fetchMoodHistory(parsedUser.email)
-        fetchAssessmentHistory(parsedUser.email)
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        setActiveTab("dashboard");
+        fetchMoodHistory(parsedUser.email);
+        fetchAssessmentHistory(parsedUser.email);
       } catch (error) {
-        console.error("Failed to parse user from localStorage", error)
-        localStorage.removeItem("mindspace-user")
+        console.error("Failed to parse user from localStorage", error);
+        localStorage.removeItem("mindspace-user");
       }
     }
-  }, [])
-
-  // Effect to check for a reset token in the URL
-  useEffect(() => {
-    // This logic is now handled by the manual code entry flow.
-  }, [])
+  }, []);
 
   useEffect(() => {
-    // When user logs out, switch to a public tab
-    if (!user) setActiveTab("mood")
-  }, [user])
+    if (!user) setActiveTab("mood");
+  }, [user]);
 
   const handleGuestAction = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!user) {
-      toast.error("Please log in to use this feature.")
-      setLoginModalOpen(true)
-      return true
+      toast.error("Please log in to use this feature.");
+      setLoginModalOpen(true);
+      return true;
     }
-    return false
-  }
+    return false;
+  };
 
   const moodInsights = {
     daysTracked: moodHistory.length,
     averageMoodValue:
       moodHistory.length > 0
-        ? moodHistory.reduce((acc, entry) => acc + (moodValueMap[entry.mood] || 50), 0) / moodHistory.length
+        ? moodHistory.reduce(
+            (acc, entry) => acc + (moodValueMap[entry.mood] || 50),
+            0
+          ) / moodHistory.length
         : 0,
-  }
+  };
 
   const moodOptions = [
-    { emoji: "😊", label: "Great", value: "great", color: "bg-green-100 text-green-800" },
-    { emoji: "🙂", label: "Good", value: "good", color: "bg-blue-100 text-blue-800" },
-    { emoji: "😐", label: "Okay", value: "okay", color: "bg-yellow-100 text-yellow-800" },
-    { emoji: "😔", label: "Low", value: "low", color: "bg-orange-100 text-orange-800" },
-    { emoji: "😢", label: "Struggling", value: "struggling", color: "bg-red-100 text-red-800" },
-  ]
+    {
+      emoji: "😊",
+      label: "Great",
+      value: "great",
+      color: "bg-green-100 text-green-800",
+    },
+    {
+      emoji: "🙂",
+      label: "Good",
+      value: "good",
+      color: "bg-blue-100 text-blue-800",
+    },
+    {
+      emoji: "😐",
+      label: "Okay",
+      value: "okay",
+      color: "bg-yellow-100 text-yellow-800",
+    },
+    {
+      emoji: "😔",
+      label: "Low",
+      value: "low",
+      color: "bg-orange-100 text-orange-800",
+    },
+    {
+      emoji: "😢",
+      label: "Struggling",
+      value: "struggling",
+      color: "bg-red-100 text-red-800",
+    },
+  ];
 
   const resources = [
-    { title: "Understanding Anxiety", category: "Mental Health", readTime: "5 min", url: "https://www.nimh.nih.gov/health/topics/anxiety-disorders" },
-    { title: "Coping with Depression", category: "Mental Health", readTime: "7 min", url: "https://www.nimh.nih.gov/health/topics/depression" },
-    { title: "Stress Management Techniques", category: "Wellness", readTime: "4 min", url: "https://www.cdc.gov/mental-health/living-with/index.html" },
-   
-  ]
+    {
+      title: "Understanding Anxiety",
+      category: "Mental Health",
+      readTime: "5 min",
+      url: "https://www.nimh.nih.gov/health/topics/anxiety-disorders",
+    },
+    {
+      title: "Coping with Depression",
+      category: "Mental Health",
+      readTime: "7 min",
+      url: "https://www.nimh.nih.gov/health/topics/depression",
+    },
+    {
+      title: "Stress Management Techniques",
+      category: "Wellness",
+      readTime: "4 min",
+      url: "https://www.cdc.gov/mental-health/living-with/index.html",
+    },
+  ];
 
   const moodChartData = {
-    labels: moodHistory.slice(-7).map(entry => new Date(entry.timestamp).toLocaleDateString()),
+    labels: moodHistory
+      .slice(-7)
+      .map((entry) => new Date(entry.timestamp).toLocaleDateString()),
     datasets: [
       {
         label: "Mood Score",
-        data: moodHistory.slice(-7).map(entry => moodValueMap[entry.mood] || 50),
+        data: moodHistory
+          .slice(-7)
+          .map((entry) => moodValueMap[entry.mood] || 50),
         fill: false,
         borderColor: "#6366f1",
         backgroundColor: "#6366f1",
         tension: 0.3,
       },
     ],
-  }
+  };
 
   const anxietyChartData = {
-    labels: anxietyHistory.map(item => item.date),
+    labels: anxietyHistory.map((item) => item.date),
     datasets: [
       {
         label: "Anxiety Score (GAD-7)",
-        data: anxietyHistory.map(item => item.score),
+        data: anxietyHistory.map((item) => item.score),
         fill: false,
         borderColor: "#f59e42",
         backgroundColor: "#f59e42",
         tension: 0.3,
       },
     ],
-  }
+  };
 
   const depressionChartData = {
-    labels: depressionHistory.map(item => item.date),
+    labels: depressionHistory.map((item) => item.date),
     datasets: [
       {
         label: "Depression Score (PHQ-9)",
-        data: depressionHistory.map(item => item.score),
+        data: depressionHistory.map((item) => item.score),
         fill: false,
-        borderColor: "#3b82f6", // blue
+        borderColor: "#3b82f6",
         backgroundColor: "#3b82f6",
         tension: 0.3,
       },
     ],
-  }
+  };
 
   const stressChartData = {
-    labels: stressHistory.map(item => item.date),
+    labels: stressHistory.map((item) => item.date),
     datasets: [
       {
         label: "Stress Score",
-        data: stressHistory.map(item => item.score),
+        data: stressHistory.map((item) => item.score),
         fill: false,
-        borderColor: "#ec4899", // pink
+        borderColor: "#ec4899",
         backgroundColor: "#ec4899",
         tension: 0.3,
       },
     ],
-  }
+  };
 
   const assessmentOptions = [
     { label: "Not at all", value: "0" },
     { label: "Several days", value: "1" },
     { label: "More than half the days", value: "2" },
     { label: "Nearly every day", value: "3" },
-  ]
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -471,19 +656,31 @@ export default function MentalHealthPortal() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <Heart className="w-6 h-6 text-primary-foreground" style={{ color: "oklch(0.985 0.015 150)" }} />
+                <Heart
+                  className="w-6 h-6 text-primary-foreground"
+                  style={{ color: "oklch(0.985 0.015 150)" }}
+                />
               </div>
               <div>
-                <h1 className="font-heading font-bold text-xl text-foreground" style={{ color: "oklch(0.78 0.13 13.5)" }}>MindSpace</h1>
-                <p className="text-sm text-muted-foreground">Your mental wellness companion</p>
+                <h1
+                  className="font-heading font-bold text-xl text-foreground"
+                  style={{ color: "oklch(0.78 0.13 13.5)" }}
+                >
+                  MindSpace
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Your mental wellness companion
+                </p>
               </div>
             </div>
             {mounted && user ? (
               <div className="flex items-center gap-4">
-                <Button variant="outline" size="sm" onClick={() => setActiveTab("dashboard")}>
-                  Dashboard
-                </Button>
-                <Button variant="ghost" size="sm" onClick={handleSignOut} className="hover:bg-transparent">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSignOut}
+                  className="hover:bg-[oklch(0.78_0.13_13.5)] hover:text-white"
+                >
                   Sign Out
                 </Button>
               </div>
@@ -491,7 +688,11 @@ export default function MentalHealthPortal() {
               <div className="flex items-center gap-2">
                 <Dialog open={loginModalOpen} onOpenChange={setLoginModalOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="hover:bg-transparent">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="hover:bg-[oklch(0.78_0.13_13.5)] hover:text-white"
+                    >
                       Login
                     </Button>
                   </DialogTrigger>
@@ -499,7 +700,9 @@ export default function MentalHealthPortal() {
                     <form onSubmit={handleLogin}>
                       <DialogHeader>
                         <DialogTitle>Login</DialogTitle>
-                        <DialogDescription>Access your MindSpace account.</DialogDescription>
+                        <DialogDescription>
+                          Access your MindSpace account.
+                        </DialogDescription>
                       </DialogHeader>
                       <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-4 items-center gap-4">
@@ -519,27 +722,47 @@ export default function MentalHealthPortal() {
                           <Label htmlFor="password" className="text-right">
                             Password
                           </Label>
-                          <Input id="password" name="password" type="password" className="col-span-3 border-2 border-transparent focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[oklch(0.78_0.13_13.5)]" required />
+                          <Input
+                            id="password"
+                            name="password"
+                            type="password"
+                            className="col-span-3 border-2 border-transparent focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[oklch(0.78_0.13_13.5)]"
+                            required
+                          />
                         </div>
                       </div>
                       <DialogFooter>
-                        <Button type="submit" className="w-full hover:bg-primary/90" disabled={isLoading}>
+                        <Button
+                          type="submit"
+                          className="w-full hover:bg-primary/90"
+                          disabled={isLoading}
+                        >
                           {isLoading ? "Logging in..." : "Login"}
                         </Button>
                       </DialogFooter>
                     </form>
                   </DialogContent>
                 </Dialog>
-                <Dialog open={registerModalOpen} onOpenChange={setRegisterModalOpen}>
+                <Dialog
+                  open={registerModalOpen}
+                  onOpenChange={setRegisterModalOpen}
+                >
                   <DialogTrigger asChild>
-                    <Button size="sm" className="hover:bg-primary/90">Sign Up</Button>
+                     <Button
+                      variant="ghost"
+                      size="sm"
+                      className="hover:bg-[oklch(0.78_0.13_13.5)] hover:text-white"
+                    >
+                      Sign Up
+                    </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[425px]">
                     <form onSubmit={handleRegister}>
                       <DialogHeader>
                         <DialogTitle>Create an account</DialogTitle>
                         <DialogDescription>
-                          Join MindSpace to track your progress and connect with the community.
+                          Join MindSpace to track your progress and connect with
+                          the community.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="grid gap-4 py-4">
@@ -547,10 +770,19 @@ export default function MentalHealthPortal() {
                           <Label htmlFor="name" className="text-right">
                             Name
                           </Label>
-                          <Input id="name" name="name" placeholder="Your Name" className="col-span-3 border-2 border-transparent focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[oklch(0.78_0.13_13.5)]" required />
+                          <Input
+                            id="name"
+                            name="name"
+                            placeholder="Your Name"
+                            className="col-span-3 border-2 border-transparent focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[oklch(0.78_0.13_13.5)]"
+                            required
+                          />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="email-register" className="text-right">
+                          <Label
+                            htmlFor="email-register"
+                            className="text-right"
+                          >
                             Email
                           </Label>
                           <Input
@@ -563,7 +795,10 @@ export default function MentalHealthPortal() {
                           />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="password-register" className="text-right">
+                          <Label
+                            htmlFor="password-register"
+                            className="text-right"
+                          >
                             Password
                           </Label>
                           <Input
@@ -576,7 +811,11 @@ export default function MentalHealthPortal() {
                         </div>
                       </div>
                       <DialogFooter>
-                        <Button type="submit" className="w-full hover:bg-primary/90" disabled={isLoading}>
+                        <Button
+                          type="submit"
+                          className="w-full hover:bg-primary/90"
+                          disabled={isLoading}
+                        >
                           {isLoading ? "Creating Account..." : "Create Account"}
                         </Button>
                       </DialogFooter>
@@ -600,7 +839,6 @@ export default function MentalHealthPortal() {
               ? "How are you feeling today? Let's check in on your mental wellness."
               : "Access anonymous mental health resources, track your mood, and find support when you need it most. You're not alone in this journey."}
           </p>
-         
         </section>
 
         {/* Main Content Tabs */}
@@ -635,44 +873,64 @@ export default function MentalHealthPortal() {
                 <CardTitle className="font-heading flex items-center gap-2">
                   <TrendingUp className="w-5 h-5" /> Mood Timeline
                 </CardTitle>
-                <CardDescription>Your mood trends over the last 7 entries.</CardDescription>
+                <CardDescription>
+                  Your mood trends over the last 7 entries.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-[220px] bg-muted/50 rounded-lg flex items-center justify-center">
                   {moodHistory.length > 0 ? (
-                    <Line data={moodChartData} options={{
-                      scales: {
-                        y: { min: 0, max: 100, title: { display: true, text: "Mood Score" } }
-                      }
-                    }} />
+                    <Line
+                      data={moodChartData}
+                      options={{
+                        scales: {
+                          y: {
+                            min: 0,
+                            max: 100,
+                            title: { display: true, text: "Mood Score" },
+                          },
+                        },
+                      }}
+                    />
                   ) : (
-                    <p className="text-sm text-muted-foreground">No mood data yet.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No mood data yet.
+                    </p>
                   )}
                 </div>
               </CardContent>
             </Card>
 
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid ">
               <Card>
                 <CardHeader>
                   <CardTitle className="font-heading flex items-center gap-2">
-                    <List className="w-5 h-5" /> Recent Entries
+                    <List className="w-10 h-5" /> Recent Entries
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {moodHistory.length > 0 ? (
                       moodHistory.slice(0, 3).map((entry, index) => (
-                        <div key={index} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                        <div
+                          key={index}
+                          className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg"
+                        >
                           <div
                             className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${
-                              moodOptions.find((m) => m.value === entry.mood)?.color
+                              moodOptions.find((m) => m.value === entry.mood)
+                                ?.color
                             }`}
                           >
-                            {moodOptions.find((m) => m.value === entry.mood)?.emoji}
+                            {
+                              moodOptions.find((m) => m.value === entry.mood)
+                                ?.emoji
+                            }
                           </div>
                           <div>
-                            <p className="font-semibold capitalize">{entry.mood}</p>
+                            <p className="font-semibold capitalize">
+                              {entry.mood}
+                            </p>
                             <p className="text-sm text-muted-foreground truncate">
                               {entry.note || "No note added."}
                             </p>
@@ -683,25 +941,13 @@ export default function MentalHealthPortal() {
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">No mood entries yet.</p>
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No mood entries yet.
+                      </p>
                     )}
                   </div>
                 </CardContent>
               </Card>
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="font-heading flex items-center gap-2">
-                      <Target className="w-5 h-5" /> Wellness Goals
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[100px] bg-muted/50 rounded-lg flex items-center justify-center">
-                      <p className="text-sm text-muted-foreground">Wellness goals will be here.</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
             </div>
             <Card>
               <CardHeader>
@@ -713,13 +959,22 @@ export default function MentalHealthPortal() {
               <CardContent>
                 <div className="h-[220px] bg-muted/50 rounded-lg flex items-center justify-center">
                   {anxietyHistory.length > 0 ? (
-                    <Line data={anxietyChartData} options={{
-                      scales: {
-                        y: { min: 0, max: 21, title: { display: true, text: "GAD-7 Score" } }
-                      }
-                    }} />
+                    <Line
+                      data={anxietyChartData}
+                      options={{
+                        scales: {
+                          y: {
+                            min: 0,
+                            max: 21,
+                            title: { display: true, text: "GAD-7 Score" },
+                          },
+                        },
+                      }}
+                    />
                   ) : (
-                    <p className="text-sm text-muted-foreground">No anxiety assessment data yet.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No anxiety assessment data yet.
+                    </p>
                   )}
                 </div>
               </CardContent>
@@ -734,13 +989,22 @@ export default function MentalHealthPortal() {
               <CardContent>
                 <div className="h-[220px] bg-muted/50 rounded-lg flex items-center justify-center">
                   {depressionHistory.length > 0 ? (
-                    <Line data={depressionChartData} options={{
-                      scales: {
-                        y: { min: 0, max: 27, title: { display: true, text: "PHQ-9 Score" } }
-                      }
-                    }} />
+                    <Line
+                      data={depressionChartData}
+                      options={{
+                        scales: {
+                          y: {
+                            min: 0,
+                            max: 27,
+                            title: { display: true, text: "PHQ-9 Score" },
+                          },
+                        },
+                      }}
+                    />
                   ) : (
-                    <p className="text-sm text-muted-foreground">No depression assessment data yet.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No depression assessment data yet.
+                    </p>
                   )}
                 </div>
               </CardContent>
@@ -750,21 +1014,48 @@ export default function MentalHealthPortal() {
                 <CardTitle className="font-heading flex items-center gap-2">
                   <AlertTriangle className="w-5 h-5" /> Stress Score Timeline
                 </CardTitle>
-                <CardDescription>Your Stress Assessment scores over time.</CardDescription>
+                <CardDescription>
+                  Your Stress Assessment scores over time.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-[220px] bg-muted/50 rounded-lg flex items-center justify-center">
                   {stressHistory.length > 0 ? (
-                    <Line data={stressChartData} options={{
-                      scales: {
-                        y: { min: 0, max: 40, title: { display: true, text: "Stress Score" } }
-                      }
-                    }} />
+                    <Line
+                      data={stressChartData}
+                      options={{
+                        scales: {
+                          y: {
+                            min: 0,
+                            max: 40,
+                            title: { display: true, text: "Stress Score" },
+                          },
+                        },
+                      }}
+                    />
                   ) : (
-                    <p className="text-sm text-muted-foreground">No stress assessment data yet.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No stress assessment data yet.
+                    </p>
                   )}
                 </div>
               </CardContent>
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-heading flex items-center gap-2">
+                      <Target className="w-5 h-5" /> Wellness Goals
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[100px] bg-muted/50 rounded-lg flex items-center justify-center">
+                      <p className="text-sm text-muted-foreground">
+                        Wellness goals will be here.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </Card>
           </TabsContent>
 
@@ -772,9 +1063,12 @@ export default function MentalHealthPortal() {
           <TabsContent value="mood" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="font-heading">How are you feeling today?</CardTitle>
+                <CardTitle className="font-heading">
+                  How are you feeling today?
+                </CardTitle>
                 <CardDescription>
-                  Track your daily mood to better understand your mental health patterns
+                  Track your daily mood to better understand your mental health
+                  patterns
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -813,7 +1107,7 @@ export default function MentalHealthPortal() {
                       className="w-full"
                       style={{ backgroundColor: "oklch(0.78 0.13 13.5)" }}
                       onClick={(e) => {
-                        handleGuestAction(e) ? null : handleSaveMood()
+                        handleGuestAction(e) ? null : handleSaveMood();
                       }}
                     >
                       Save Mood Entry
@@ -826,26 +1120,41 @@ export default function MentalHealthPortal() {
             {/* Mood Insights */}
             <Card>
               <CardHeader>
-                <CardTitle className="font-heading">Your Mood Insights</CardTitle>
-                <CardDescription>Based on your recent mood entries</CardDescription>
+                <CardTitle className="font-heading">
+                  Your Mood Insights
+                </CardTitle>
+                <CardDescription>
+                  Based on your recent mood entries
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div>
                     <div className="flex justify-between text-sm mb-2">
                       <span>Overall Mood Average</span>
-                      <span className="font-medium">{moodInsights.averageMoodValue.toFixed(0)}%</span>
+                      <span className="font-medium">
+                        {moodInsights.averageMoodValue.toFixed(0)}%
+                      </span>
                     </div>
-                    <Progress value={moodInsights.averageMoodValue} className="h-2" />
+                    <Progress
+                      value={moodInsights.averageMoodValue}
+                      className="h-2"
+                    />
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-center">
                     <div className="p-3 bg-muted rounded-lg">
-                      <div className="text-2xl font-bold text-primary">{moodInsights.daysTracked}</div>
-                      <div className="text-sm text-muted-foreground">Days tracked</div>
+                      <div className="text-2xl font-bold text-primary">
+                        {moodInsights.daysTracked}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Days tracked
+                      </div>
                     </div>
                     <div className="p-3 bg-muted rounded-lg">
                       <div className="text-2xl font-bold text-primary">3</div>
-                      <div className="text-sm text-muted-foreground">Streak</div>
+                      <div className="text-sm text-muted-foreground">
+                        Streak
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -857,8 +1166,13 @@ export default function MentalHealthPortal() {
           <TabsContent value="assessment" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="font-heading">Mental Health Self-Assessment</CardTitle>
-                <CardDescription>Anonymous screening tools to help you understand your mental health</CardDescription>
+                <CardTitle className="font-heading">
+                  Mental Health Self-Assessment
+                </CardTitle>
+                <CardDescription>
+                  Anonymous screening tools to help you understand your mental
+                  health
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4">
@@ -866,10 +1180,19 @@ export default function MentalHealthPortal() {
                   <div className="p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-semibold">Anxiety Screening (GAD-7)</h3>
-                        <p className="text-sm text-muted-foreground">7 questions • 3-5 minutes</p>
+                        <h3 className="font-semibold">
+                          Anxiety Screening (GAD-7)
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          7 questions • 3-5 minutes
+                        </p>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => handleAssessmentStart("anxiety")} className="hover:bg-transparent">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleAssessmentStart("anxiety")}
+                        className="hover:bg-transparent"
+                      >
                         Start
                       </Button>
                     </div>
@@ -877,10 +1200,19 @@ export default function MentalHealthPortal() {
                   <div className="p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-semibold">Depression Screening (PHQ-9)</h3>
-                        <p className="text-sm text-muted-foreground">9 questions • 5-7 minutes</p>
+                        <h3 className="font-semibold">
+                          Depression Screening (PHQ-9)
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          9 questions • 5-7 minutes
+                        </p>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => handleAssessmentStart("depression")} className="hover:bg-transparent">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleAssessmentStart("depression")}
+                        className="hover:bg-transparent"
+                      >
                         Start
                       </Button>
                     </div>
@@ -889,35 +1221,73 @@ export default function MentalHealthPortal() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="font-semibold">Stress Assessment</h3>
-                        <p className="text-sm text-muted-foreground">10 questions • 5 minutes</p>
+                        <p className="text-sm text-muted-foreground">
+                          10 questions • 5 minutes
+                        </p>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => handleAssessmentStart("stress")} className="hover:bg-transparent">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleAssessmentStart("stress")}
+                        className="hover:bg-transparent"
+                      >
                         Start
                       </Button>
                     </div>
                   </div>
                   {/* Wellbeing Activities */}
-                  <div className="p-4 border rounded-lg" style={{ backgroundColor: "oklch(0.78 0.09 144.5)"}}>
+                  <div
+                    className="p-4 border rounded-lg"
+                    style={{ backgroundColor: "oklch(0.78 0.09 144.5)" }}
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <div>
-                        <h3 className="font-semibold text-white">Wellbeing Activities</h3>
-                        <p className="text-smtext-white text-white">Try these to relax and recharge</p>
+                        <h3 className="font-semibold text-white">
+                          Wellbeing Activities
+                        </h3>
+                        <p className="text-smtext-white text-white">
+                          Try these to relax and recharge
+                        </p>
                       </div>
                     </div>
                     <div className="grid gap-3">
                       {[
-                        { name: "Guided Breathing", sound: "/sounds/breathing.mp3", icon: <Brain className="w-6 h-6 text-blue-300" /> },
-                        { name: "Stretch", sound: "/sounds/yoga.mp3", icon: <Zap className="w-6 h-6 text-green-300" /> },
-                        { name: "Mindful Walking", sound: "/sounds/walking.mp3", icon: <Heart className="w-6 h-6 text-purple-300" /> },
-                       
+                        {
+                          name: "Guided Breathing",
+                          sound: "/sounds/breathing.mp3",
+                          icon: <Brain className="w-6 h-6 text-blue-300" />,
+                        },
+                        {
+                          name: "Stretch",
+                          sound: "/sounds/yoga.mp3",
+                          icon: <Zap className="w-6 h-6 text-green-300" />,
+                        },
+                        {
+                          name: "Mindful Walking",
+                          sound: "/sounds/walking.mp3",
+                          icon: <Heart className="w-6 h-6 text-purple-300" />,
+                        },
                       ].map((activity, idx) => (
-                        <div key={idx} className="flex items-center gap-3 p-3 rounded-lg  transition-colors">
+                        <div
+                          key={idx}
+                          className="flex items-center gap-3 p-3 rounded-lg  transition-colors"
+                        >
                           <div className="w-10 h-10 bg-blue-800 flex items-center justify-center rounded-full">
                             {activity.icon}
                           </div>
                           <div className="flex-1">
-                            <div className="font-semibold text-white">{activity.name}</div>
-                            <div className="text-xs text-white">{activity.name === "Guided Breathing" ? "3 min • Deep breathing exercise" : activity.name === "Yoga Stretch" ? "5 min • Simple yoga poses" : activity.name === "Mindful Walking" ? "10 min • Focused walking activity" : "5 min • Write 3 things you're grateful for"}</div>
+                            <div className="font-semibold text-white">
+                              {activity.name}
+                            </div>
+                            <div className="text-xs text-white">
+                              {activity.name === "Guided Breathing"
+                                ? "3 min • Deep breathing exercise"
+                                : activity.name === "Yoga Stretch"
+                                ? "5 min • Simple yoga poses"
+                                : activity.name === "Mindful Walking"
+                                ? "10 min • Focused walking activity"
+                                : "5 min • Write 3 things you're grateful for"}
+                            </div>
                           </div>
                           <Button
                             size="sm"
@@ -935,7 +1305,9 @@ export default function MentalHealthPortal() {
                 {assessmentProgress > 0 && (
                   <div className="mt-6 p-4 bg-primary/10 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Assessment Progress</span>
+                      <span className="text-sm font-medium">
+                        Assessment Progress
+                      </span>
                       <span className="text-sm">{assessmentProgress}%</span>
                     </div>
                     <Progress value={assessmentProgress} />
@@ -945,17 +1317,23 @@ export default function MentalHealthPortal() {
             </Card>
 
             {/* Assessment Modal */}
-            <Dialog open={!!assessmentModal} onOpenChange={() => setAssessmentModal(null)}>
+            <Dialog
+              open={!!assessmentModal}
+              onOpenChange={() => setAssessmentModal(null)}
+            >
               <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                   <DialogTitle>
-                    {assessmentModal === "anxiety" && "Anxiety Screening (GAD-7)"}
-                    {assessmentModal === "depression" && "Depression Screening (PHQ-9)"}
+                    {assessmentModal === "anxiety" &&
+                      "Anxiety Screening (GAD-7)"}
+                    {assessmentModal === "depression" &&
+                      "Depression Screening (PHQ-9)"}
                     {assessmentModal === "stress" && "Stress Assessment"}
                   </DialogTitle>
                   {!assessmentResult && (
                     <DialogDescription>
-                      Over the last 2 weeks, how often have you been bothered by the following problems?
+                      Over the last 2 weeks, how often have you been bothered by
+                      the following problems?
                     </DialogDescription>
                   )}
                 </DialogHeader>
@@ -969,7 +1347,8 @@ export default function MentalHealthPortal() {
                         >
                           <div className="mb-4 text-center">
                             <p className="text-sm text-muted-foreground">
-                              Question {currentQuestionIndex + 1} of {assessmentQuestions.length}
+                              Question {currentQuestionIndex + 1} of{" "}
+                              {assessmentQuestions.length}
                             </p>
                             <p className="font-semibold text-lg leading-tight">
                               {assessmentQuestions[currentQuestionIndex]}
@@ -981,7 +1360,12 @@ export default function MentalHealthPortal() {
                                 key={option.value}
                                 variant="outline"
                                 className="w-full h-11 text-base hover:bg-primary/10 hover:border-primary"
-                                onClick={() => handleAnswerSelect(currentQuestionIndex, option.value)}
+                                onClick={() =>
+                                  handleAnswerSelect(
+                                    currentQuestionIndex,
+                                    option.value
+                                  )
+                                }
                               >
                                 {option.label}
                               </Button>
@@ -989,12 +1373,16 @@ export default function MentalHealthPortal() {
                           </div>
                         </div>
                       ) : (
-                        <p className="text-muted-foreground text-center py-4">Loading questions...</p>
+                        <p className="text-muted-foreground text-center py-4">
+                          Loading questions...
+                        </p>
                       )}
                     </div>
                   ) : (
                     <div className="text-center p-4 bg-muted rounded-lg animate-in fade-in duration-500">
-                      <h3 className="font-bold text-lg mb-2">Assessment Complete!</h3>
+                      <h3 className="font-bold text-lg mb-2">
+                        Assessment Complete!
+                      </h3>
                       <p>{assessmentResult}</p>
                     </div>
                   )}
@@ -1007,8 +1395,12 @@ export default function MentalHealthPortal() {
           <TabsContent value="resources" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="font-heading">Mental Health Resources</CardTitle>
-                <CardDescription>Curated content to support your mental wellness journey</CardDescription>
+                <CardTitle className="font-heading">
+                  Mental Health Resources
+                </CardTitle>
+                <CardDescription>
+                  Curated content to support your mental wellness journey
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4">
@@ -1024,7 +1416,9 @@ export default function MentalHealthPortal() {
                             <Badge variant="secondary" className="text-xs">
                               {resource.category}
                             </Badge>
-                            <span className="text-xs text-muted-foreground">{resource.readTime}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {resource.readTime}
+                            </span>
                           </div>
                         </div>
                         <a
@@ -1032,7 +1426,11 @@ export default function MentalHealthPortal() {
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          <Button variant="ghost" size="sm" className="hover:bg-transparent">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-transparent"
+                          >
                             Read
                           </Button>
                         </a>
@@ -1046,24 +1444,40 @@ export default function MentalHealthPortal() {
             {/* Emergency Resources */}
             <Card>
               <CardHeader>
-                <CardTitle className="font-heading">Emergency Resources</CardTitle>
-                <CardDescription>Available 24/7 when you need immediate support</CardDescription>
+                <CardTitle className="font-heading">
+                  Emergency Resources
+                </CardTitle>
+                <CardDescription>
+                  Available 24/7 when you need immediate support
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3">
                   <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div>
-                      <div className="font-semibold">National Suicide Prevention Lifeline</div>
-                      <div className="text-sm text-muted-foreground">24/7 Crisis Support</div>
+                      <div className="font-semibold">
+                        National Suicide Prevention Lifeline
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        24/7 Crisis Support
+                      </div>
                     </div>
-                    <Button size="sm" className="hover:bg-primary/90">Call 14416</Button>
+                    <Button size="sm" className="hover:bg-primary/90">
+                      Call 14416
+                    </Button>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div>
                       <div className="font-semibold">Crisis Text Line</div>
-                      <div className="text-sm text-muted-foreground">Text HOME to 741741</div>
+                      <div className="text-sm text-muted-foreground">
+                        Text HOME to 741741
+                      </div>
                     </div>
-                    <Button size="sm" variant="outline" className="hover:bg-transparent">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="hover:bg-transparent"
+                    >
                       Text
                     </Button>
                   </div>
@@ -1076,8 +1490,12 @@ export default function MentalHealthPortal() {
           <TabsContent value="community" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="font-heading">Safe Community Spaces</CardTitle>
-                <CardDescription>Connect with others in moderated, supportive environments</CardDescription>
+                <CardTitle className="font-heading">
+                  Safe Community Spaces
+                </CardTitle>
+                <CardDescription>
+                  Connect with others in moderated, supportive environments
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4">
@@ -1085,9 +1503,15 @@ export default function MentalHealthPortal() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="font-semibold">Anxiety Support Group</h3>
-                        <p className="text-sm text-muted-foreground">142 members • Moderated</p>
+                        <p className="text-sm text-muted-foreground">
+                          142 members • Moderated
+                        </p>
                       </div>
-                      <Button variant="outline" size="sm" className="hover:bg-transparent">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="hover:bg-transparent"
+                      >
                         Join
                       </Button>
                     </div>
@@ -1096,9 +1520,15 @@ export default function MentalHealthPortal() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="font-semibold">Depression Recovery</h3>
-                        <p className="text-sm text-muted-foreground">89 members • Moderated</p>
+                        <p className="text-sm text-muted-foreground">
+                          89 members • Moderated
+                        </p>
                       </div>
-                      <Button variant="outline" size="sm" className="hover:bg-transparent">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="hover:bg-transparent"
+                      >
                         Join
                       </Button>
                     </div>
@@ -1106,10 +1536,18 @@ export default function MentalHealthPortal() {
                   <div className="p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-semibold">Mindfulness & Meditation</h3>
-                        <p className="text-sm text-muted-foreground">203 members • Moderated</p>
+                        <h3 className="font-semibold">
+                          Mindfulness & Meditation
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          203 members • Moderated
+                        </p>
                       </div>
-                      <Button variant="outline" size="sm" className="hover:bg-transparent">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="hover:bg-transparent"
+                      >
                         Join
                       </Button>
                     </div>
@@ -1121,26 +1559,39 @@ export default function MentalHealthPortal() {
             {/* Community Guidelines */}
             <Card>
               <CardHeader>
-                <CardTitle className="font-heading">Community Guidelines</CardTitle>
-                <CardDescription>Creating a safe space for everyone</CardDescription>
+                <CardTitle className="font-heading">
+                  Community Guidelines
+                </CardTitle>
+                <CardDescription>
+                  Creating a safe space for everyone
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
                     <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
-                    <span>Be respectful and supportive of others' experiences</span>
+                    <span>
+                      Be respectful and supportive of others' experiences
+                    </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
-                    <span>No medical advice - share experiences and coping strategies only</span>
+                    <span>
+                      No medical advice - share experiences and coping
+                      strategies only
+                    </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
-                    <span>Maintain anonymity - no personal identifying information</span>
+                    <span>
+                      Maintain anonymity - no personal identifying information
+                    </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
-                    <span>Report concerning content to moderators immediately</span>
+                    <span>
+                      Report concerning content to moderators immediately
+                    </span>
                   </li>
                 </ul>
               </CardContent>
@@ -1156,38 +1607,49 @@ export default function MentalHealthPortal() {
             <div className="flex items-center justify-center gap-2 mb-5">
               <Heart className="w-5 h-5 text-primary" />
               <span className="font-heading font-bold">MindSpace</span>
-          
-          
             </div>
-                 <div className="flex flex-wrap justify-center gap-2">
-            <Badge variant="secondary" className="px-3 py-1">
-              <Shield className="w-3 h-3 mr-1" />
-              100% Anonymous
-            </Badge>
-            <Badge variant="secondary" className="px-3 py-1">
-              <Heart className="w-3 h-3 mr-1" />
-              Stigma-Free
-            </Badge>
-            <Badge variant="secondary" className="px-3 py-1">
-              <Users className="w-3 h-3 mr-1" />
-              Community Support
-            </Badge>
-          </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Badge variant="secondary" className="px-3 py-1">
+                <Shield className="w-3 h-3 mr-1" />
+                100% Anonymous
+              </Badge>
+              <Badge variant="secondary" className="px-3 py-1">
+                <Heart className="w-3 h-3 mr-1" />
+                Stigma-Free
+              </Badge>
+              <Badge variant="secondary" className="px-3 py-1">
+                <Users className="w-3 h-3 mr-1" />
+                Community Support
+              </Badge>
+            </div>
 
             <p className="text-sm text-muted-foreground mb-7 mt-10">
-              Your privacy and safety are our top priorities. All interactions are anonymous and secure.
+              Your privacy and safety are our top priorities. All interactions
+              are anonymous and secure.
             </p>
             <div className="flex justify-center gap-6 text-sm">
-              <a href="#" className="text-muted-foreground hover:text-foreground">
+              <a
+                href="#"
+                className="text-muted-foreground hover:text-foreground"
+              >
                 Privacy Policy
               </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground">
+              <a
+                href="#"
+                className="text-muted-foreground hover:text-foreground"
+              >
                 Terms of Service
               </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground">
+              <a
+                href="#"
+                className="text-muted-foreground hover:text-foreground"
+              >
                 Crisis Resources
               </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground">
+              <a
+                href="#"
+                className="text-muted-foreground hover:text-foreground"
+              >
                 Contact
               </a>
             </div>
@@ -1198,16 +1660,22 @@ export default function MentalHealthPortal() {
       <div
         onClickCapture={(e) => {
           if (!user) {
-            e.preventDefault()
-            e.stopPropagation()
-            toast.error("Please log in to use the chat feature.")
-            setLoginModalOpen(true)
+            e.preventDefault();
+            e.stopPropagation();
+            toast.error("Please log in to use the chat feature.");
+            setLoginModalOpen(true);
           }
         }}
       >
         <CrisisChatbot
-          onStartAssessment={handleAssessmentStart}
-          onNavigateTo={(tab) => setActiveTab(tab)}
+          chatHistory={chatHistory}
+          onSendMessage={handleSendMessages}
+          isBotTyping={isBotTyping}
+          activeWidget={activeChatWidget}
+          // New props for confirmation flow
+          pendingWidget={pendingWidget}
+          onConfirm={() => handleChatConfirmation(true)}
+          onDecline={() => handleChatConfirmation(false)}
         />
       </div>
 
@@ -1215,7 +1683,9 @@ export default function MentalHealthPortal() {
       <Dialog open={activityDialogOpen} onOpenChange={setActivityDialogOpen}>
         <DialogContent className="bg-blue-900 text-white">
           <DialogHeader>
-            <DialogTitle className="text-white">{currentActivity?.name}</DialogTitle>
+            <DialogTitle className="text-white">
+              {currentActivity?.name}
+            </DialogTitle>
             <DialogDescription className="text-blue-200">
               Enjoy this activity with relaxing sound and animation.
             </DialogDescription>
@@ -1224,9 +1694,15 @@ export default function MentalHealthPortal() {
             {/* Sound Animation */}
             <div className="w-24 h-24 rounded-full bg-blue-800 flex items-center justify-center relative overflow-hidden">
               {/* Simple animated sound waves */}
-              <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}>
-                <div className={`animate-pulse w-16 h-16 rounded-full bg-blue-600 opacity-50`} />
-                <div className={`animate-ping w-20 h-20 rounded-full bg-blue-400 opacity-30 absolute`} />
+              <div
+                className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
+              >
+                <div
+                  className={`animate-pulse w-16 h-16 rounded-full bg-blue-600 opacity-50`}
+                />
+                <div
+                  className={`animate-ping w-20 h-20 rounded-full bg-blue-400 opacity-30 absolute`}
+                />
               </div>
               <Brain className="w-12 h-12 text-blue-300 z-10" />
             </div>
@@ -1236,9 +1712,9 @@ export default function MentalHealthPortal() {
               src={currentActivity?.sound}
               onEnded={() => {
                 if (audioRef.current) {
-                  audioRef.current.currentTime = 0
-                  audioRef.current.play()
-                  setIsPlaying(true)
+                  audioRef.current.currentTime = 0;
+                  audioRef.current.play();
+                  setIsPlaying(true);
                 }
               }}
             />
@@ -1262,12 +1738,16 @@ export default function MentalHealthPortal() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="border-blue-300 text-blue-300" onClick={() => setActivityDialogOpen(false)}>
+            <Button
+              variant="outline"
+              className="border-blue-300 text-blue-300"
+              onClick={() => setActivityDialogOpen(false)}
+            >
               Close
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

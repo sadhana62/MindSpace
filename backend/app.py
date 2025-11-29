@@ -265,7 +265,7 @@ def chat():
 
     if intent == "CRISIS_PANIC":
         breathing_tag = TOOL_DEFINITIONS['activities']['breathing']['tag']
-        panic_response = f"I am here with you. I'm loading the breathing assistant now. Follow the animation with me. {breathing_tag}"
+        panic_response = f"I am here with you. I'm loading the breathing assistant now. Follow the animation with me."
         
         if history_service:
             history_service.add_message(chat_code, user_email, user_message)
@@ -294,7 +294,7 @@ def chat():
 
     elif intent == "MOOD_LOG":
         mood_tag = TOOL_DEFINITIONS['mood_tracker']['tag']
-        mood_response = f"Understood. Let's log how you are feeling right now. {mood_tag}"
+        mood_response = f"Understood. Let's log how you are feeling right now."
         
         if history_service:
             history_service.add_message(chat_code, user_email, user_message)
