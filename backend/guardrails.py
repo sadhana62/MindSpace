@@ -10,7 +10,7 @@ def is_query_mental_health_related(user_message: str) -> bool:
         return False
     
     # 1. FEW-SHOT PROMPT (The Fix)
-    # We give it clear examples of what is allowed vs not allowed.
+    # Clear examples of what is allowed vs not allowed.
     system_instruction = (
         "You are a strict content classifier for a mental health chatbot. "
         "Classify the user's text into exactly one of these three categories:\n"

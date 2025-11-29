@@ -123,7 +123,6 @@ try:
     mongo_client.admin.command('ping')
     print("MongoDB Atlas Connected.")
 
-    # Initialize the Bucket Service
     history_service = BucketHistoryService(mongo_client, db_name=HISTORY_DB_NAME)
 
 except Exception as e:
@@ -138,14 +137,9 @@ def home():
     return jsonify({"message": "Mental Health Chatbot API is running!", "status": "active"})
 
 
-# ==========================================
-#  NEW HIERARCHICAL ROUTERS
-# ==========================================
-
 def execute_router(prompt, default_val):
     """Helper to run the LLM call for any router"""
     try:
-        # Prefer Groq for speed
         router_bot = groq_bot if groq_bot else openai_bot
         messages = [{"role": "system", "content": prompt}]
         response_text = router_bot.generate_response_with_history(messages)
@@ -221,7 +215,7 @@ def determine_widget_type(text_response):
     If yes, returns that specific type. If no, returns 'general_chat'.
     """
     # 1. Check for specific activity tags (from your TOOL_DEFINITIONS)
-    # We iterate through your definitions to see if the tag string exists in the response
+    # Iterate through definitions to see if the tag string exists in the response
     if 'activities' in TOOL_DEFINITIONS:
         for activity_key, activity_data in TOOL_DEFINITIONS['activities'].items():
             if activity_data.get('tag') and activity_data['tag'] in text_response:

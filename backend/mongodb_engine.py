@@ -35,7 +35,7 @@ class BucketHistoryService:
             "timestamp": datetime.now(UTC)
         }
         
-        # 1. ATOMIC UPDATE: Try to push to the latest bucket if it has space
+        # 1. Try to push to the latest bucket if it has space
         update_result = self.collection.update_one(
             {
                 "conversation_id": conversation_id,
