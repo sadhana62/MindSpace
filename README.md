@@ -40,7 +40,7 @@ MindSpace is a full-stack web application designed to be a safe and anonymous sp
   - [MongoDBAtlas]
   - [ChromaDB]
 
-## 📋 Prerequisites
+## Prerequisites
 
 - [Node.js](https://nodejs.org/en/) (v18.x or later)
 - [Python](https://www.python.org/downloads/) (v3.8 or later) and `pip`
@@ -82,9 +82,18 @@ touch ../.env
 ```
 
 ```bash
-# Initialize and apply database migrations
-# (Make sure you are still in the 'backend' directory)
 cd backend
+
+# Before executing the app.py make sure to run files from data_pipeline folder
+# in this order
+```bash
+cd data_pipeline
+python fetch_from_news.py
+python fetch_from_ressearch.py
+python merge_data.py
+python create_vector_db.py
+
+#Now your vector db is set up for RAG 
 
 python app.py
 
