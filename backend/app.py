@@ -14,7 +14,7 @@ import random
 import chromadb
 from sentence_transformers import SentenceTransformer
 from local_llm_engine import OllamaEngine
-from online_llm_engine import OpenAIEngine, GroqEngine
+from online_llm_engine import OpenAIEngine, OpenRouterEngine, GroqEngine
 from database import init_db, db, User, MoodEntry, ActivityLog, AssessmentResult
 from pymongo import MongoClient
 from mongodb_engine import BucketHistoryService
@@ -35,7 +35,7 @@ def find_project_root() -> Path:
         if (current_path / '.git').exists() or (current_path / '.env').exists():
             return current_path
         current_path = current_path.parent
-    raise FileNotFoundError("Project root marker (.git or .env) not found.")
+    return Path(__file__).resolve().parent.parent
 
 
 try:
@@ -52,6 +52,7 @@ print("Initializing AI System...")
 # 1. Intialize AI Engines
 local_bot = OllamaEngine(model="qwen2.5:1.5b") 
 openai_bot = OpenAIEngine(api_key=os.getenv("OPENAI_API_KEY"))
+openrouter_bot = OpenRouterEngine(api_key=os.getenv("OPENROUTER_API_KEY"))
 groq_bot = GroqEngine()
 
 # 2. RAG Vector Database
@@ -106,14 +107,22 @@ except OSError:
     pass
 
 
-CORS(app)                      
+allowed_origins = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv(
+        "FRONTEND_URL",
+        "http://localhost:3000,http://127.0.0.1:3000",
+    ).split(",")
+    if origin.strip()
+]
+CORS(app, resources={r"/*": {"origins": allowed_origins}})
 bcrypt = Bcrypt(app)          
 init_db(app)     
 
 # --- MongoDB Atlas Initialization ---
 MONGO_URI = os.getenv("MONGO_DB_URI") 
 HISTORY_DB_NAME = os.getenv("CHAT_HISTORY_DB_NAME", "mindspace")
-mongo_client = MongoClient(MONGO_URI)
+mongo_client = None
 
 try:
     if not MONGO_URI:
@@ -140,7 +149,12 @@ def home():
 def execute_router(prompt, default_val):
     """Helper to run the LLM call for any router"""
     try:
-        router_bot = groq_bot if groq_bot else openai_bot
+        if getattr(openrouter_bot, "is_available", False):
+            router_bot = openrouter_bot
+        elif getattr(groq_bot, "is_available", False):
+            router_bot = groq_bot
+        else:
+            router_bot = openai_bot
         messages = [{"role": "system", "content": prompt}]
         response_text = router_bot.generate_response_with_history(messages)
         
@@ -150,6 +164,29 @@ def execute_router(prompt, default_val):
     except Exception as e:
         print(f"Router Error: {e}")
         return default_val
+
+
+def generate_ai_response(messages):
+    """
+    Prefer Groq when available, but fall back to OpenAI if the request fails.
+    This keeps the chatbot usable when one provider is down or misconfigured.
+    """
+    if getattr(openrouter_bot, "is_available", False):
+        reply = openrouter_bot.generate_response_with_history(messages)
+        if reply != "I am currently having trouble connecting to the cloud server.":
+            return reply
+
+    if getattr(groq_bot, "is_available", False):
+        reply = groq_bot.generate_response_with_history(messages)
+        if reply != "I'm having trouble connecting to the AI server. Please try again.":
+            return reply
+
+    if getattr(openai_bot, "is_available", False):
+        reply = openai_bot.generate_response_with_history(messages)
+        if reply != "I am currently having trouble connecting to the cloud server.":
+            return reply
+
+    return "I'm having trouble connecting to the AI server. Please try again."
 
 def analyze_broad_intent(user_input):
     """
@@ -255,14 +292,12 @@ def chat():
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    chat_code = user.chat_code  
-
     # 2. MESSAGE EXTRACTION
     user_message = ""
     if single_message:
         user_message = str(single_message)
     elif isinstance(messages_payload, list) and len(messages_payload) > 0:
-        for m in reversed(messages_payload):
+        for m in reversed(messages_payload): # Find the most recent user message
             if m.get("role") == "user":
                 user_message = m.get("content")
                 break
@@ -274,7 +309,7 @@ def chat():
     if not is_query_mental_health_related(user_message):
         reply = random.choice(OFF_TOPIC_REPLIES)
         if history_service:
-            history_service.add_message(chat_code, user_email, user_message)
+            history_service.add_message(user.id, user_email, user_message)
         # Returns standard structure
         return jsonify({
             "response": reply, 
@@ -340,7 +375,7 @@ def chat():
         # 5. HISTORY RETRIEVAL
         chat_history = []
         if history_service:
-            chat_history = history_service.get_history(chat_code, limit=20)
+            chat_history = history_service.get_history(user.id, limit=20)
 
         # 6. RAG RETRIEVAL
         context_chunks = get_rag_chunks(user_message)
@@ -364,9 +399,9 @@ def chat():
              if local_bot.check_status():
                  assistant_reply = local_bot.generate_response_with_history(final_messages)
              else:
-                 assistant_reply = groq_bot.generate_response_with_history(final_messages)
+                 assistant_reply = generate_ai_response(final_messages)
         else:
-             assistant_reply = groq_bot.generate_response_with_history(final_messages)
+             assistant_reply = generate_ai_response(final_messages)
         
         # 9. DETERMINE WIDGET (Final Check)
         # Even in general chat, the LLM might have decided to output a tag.
@@ -378,8 +413,8 @@ def chat():
     # 1. Save the RAW response (with tags) to History
     # We keep tags in history so the LLM knows it previously used a tool
     if history_service:
-        history_service.add_message(conversation_id=chat_code, sender_id=user_email, content=user_message)
-        history_service.add_message(conversation_id=chat_code, sender_id="assistant", content=assistant_reply)
+        history_service.add_message(conversation_id=user.id, sender_id=user_email, content=user_message)
+        history_service.add_message(conversation_id=user.id, sender_id="assistant", content=assistant_reply)
         
     # 2. Creating a CLEAN response (no tags) for the Frontend
     clean_reply = remove_tags_from_text(assistant_reply)
@@ -593,4 +628,8 @@ def get_stress_questions():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000, use_reloader=True)
+    app.run(
+        debug=os.getenv("FLASK_DEBUG", "false").lower() == "true",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "5000")),
+    )

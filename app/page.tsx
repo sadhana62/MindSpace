@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, FormEvent, useEffect, useRef } from "react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -139,7 +142,7 @@ export default function MentalHealthPortal() {
     const data = Object.fromEntries(formData.entries());
 
     try {
-      const response = await fetch("http://localhost:5000/register", {
+      const response = await fetch(`${API_URL}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -168,7 +171,7 @@ export default function MentalHealthPortal() {
     const data = Object.fromEntries(formData.entries());
 
     try {
-      const response = await fetch("http://localhost:5000/login", {
+      const response = await fetch(`${API_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -195,6 +198,7 @@ export default function MentalHealthPortal() {
     setAnxietyHistory([]);
     setDepressionHistory([]);
     setStressHistory([]);
+    setHistory([]); // <-- THIS IS THE FIX: Clear the chat history state
     setAssessmentProgress(0);
     toast.success("You have been signed out.");
   };
@@ -204,7 +208,7 @@ export default function MentalHealthPortal() {
     setIsLoading(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const response = await fetch("http://localhost:5000/mood", {
+      const response = await fetch(`${API_URL}/mood`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -229,7 +233,7 @@ export default function MentalHealthPortal() {
   };
 
   const fetchMoodHistory = async (email: string) => {
-    const response = await fetch(`http://localhost:5000/moods/${email}`);
+    const response = await fetch(`${API_URL}/moods/${email}`);
     if (response.ok) {
       const data = await response.json();
       setMoodHistory(data);
@@ -239,7 +243,7 @@ export default function MentalHealthPortal() {
   const fetchAssessmentHistory = async (email: string) => {
     try {
       const response = await fetch(
-        `http://localhost:5000/assessments/${email}`
+        `${API_URL}/assessments/${email}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -287,7 +291,7 @@ export default function MentalHealthPortal() {
     else if (type === "depression") endpoint = "depression";
     else if (type === "stress") endpoint = "stress";
     const response = await fetch(
-      `http://localhost:5000/assessment/questions/${endpoint}`
+      `${API_URL}/assessment/questions/${endpoint}`
     );
     if (response.ok) {
       const data = await response.json();
@@ -312,7 +316,7 @@ export default function MentalHealthPortal() {
   const handleAssessmentSubmit = async (type: string, answers: any) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/assessment/${type}`, {
+      const response = await fetch(`${API_URL}/assessment/${type}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: user?.email, answers }),
@@ -382,7 +386,7 @@ export default function MentalHealthPortal() {
     setPendingWidget(null); // Reset pending state on new message
 
     try {
-      const response = await fetch("http://localhost:5000/chat", {
+      const response = await fetch(`${API_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

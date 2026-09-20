@@ -117,7 +117,7 @@ export function CrisisChatbot({
                   <AvatarImage src="/Logo1.png" alt="MindSpace Bot" />
                   <AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback>
                 </Avatar>
-                <div className="bg-card border p-4 rounded-2xl rounded-tl-none shadow-sm max-w-[85%] text-base">
+                <div className="bg-card border p-4 rounded-2xl rounded-tl-none shadow-sm max-w-[75%] text-sm">
                   <p>
                     Hi! I'm here to support you. We can talk about how you're feeling, or I can guide you through some relaxation exercises. How can I help today?
                   </p>
@@ -145,7 +145,7 @@ export function CrisisChatbot({
                     </AvatarFallback>
                   </Avatar>
                   <div
-                    className={`p-4 rounded-2xl shadow-sm max-w-[85%] text-base ${
+                    className={`p-4 rounded-2xl shadow-sm max-w-[75%] text-sm ${
                       msg.role === "user"
                         ? "bg-primary text-primary-foreground rounded-tr-none"
                         : "bg-card border rounded-tl-none"
@@ -176,8 +176,8 @@ export function CrisisChatbot({
                     <AvatarImage src="/Logo1.png" alt="MindSpace Bot" />
                     <AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback>
                   </Avatar>
-                  <div className="bg-card border p-6 rounded-2xl rounded-tl-none shadow-md max-w-[85%] space-y-4 border-primary/20">
-                    <p className="text-base font-medium">
+                  <div className="bg-card border p-6 rounded-2xl rounded-tl-none shadow-md max-w-[75%] space-y-4 border-primary/20">
+                    <p className="text-sm font-medium">
                       Would you like to start the <span className="text-primary font-bold">{formatWidgetName(pendingWidget)}</span>?
                     </p>
                     <div className="flex gap-3">
@@ -208,8 +208,8 @@ export function CrisisChatbot({
                     <AvatarImage src="/Logo1.png" alt="MindSpace Bot" />
                     <AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback>
                   </Avatar>
-                   <div className="bg-card border p-5 rounded-2xl rounded-tl-none shadow-sm max-w-[85%] w-full">
-                     <p className="text-base mb-4 font-medium">How are you feeling right now?</p>
+                   <div className="bg-card border p-5 rounded-2xl rounded-tl-none shadow-sm max-w-[75%] w-full text-sm">
+                     <p className="mb-4 font-medium">How are you feeling right now?</p>
                      <div className="grid grid-cols-5 gap-4">
                        {["😢", "😔", "😐", "🙂", "😊"].map((emoji) => (
                          <button
