@@ -149,7 +149,7 @@ passlib==1.7.4
 pillow==11.3.0
 platformdirs==4.3.6
 posthog==5.4.0
-preshed==3.0.10
+preshed==3.0.13
 prompt_toolkit==3.0.48
 proto-plus==1.24.0
 protobuf==5.29.5
